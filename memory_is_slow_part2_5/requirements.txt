@@ -1,0 +1,5 @@
+jupyter
+polars
+numpy
+matplotlib
+fontforge

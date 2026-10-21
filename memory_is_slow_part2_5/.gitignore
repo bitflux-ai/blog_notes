@@ -1,0 +1,8 @@
+count_10_barebones
+count_10_loop
+count_10_unrolled
+count_10_hugepage
+count_10_avx512
+create_data
+in_ram
+diskbased/benchmark
