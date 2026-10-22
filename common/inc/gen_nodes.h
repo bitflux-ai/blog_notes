@@ -15,6 +15,10 @@
 //   inserts     integers below v_N that the keystream did not keep, drawn
 //               uniformly (exactly the distribution of random new values)
 //   indexes     uniform in [1, N - 2]
+//   clustered   (g_clustered_nodes) ops integers absent from both the
+//               originals and the inserts, counting up from a random original:
+//               one narrow key range, in increasing order (a sorted batch, or
+//               time-ordered keys landing in one region)
 // Everything reads the file O_DIRECT so the page cache never holds it.
 // See create_nodes/fast_nodes.c for the writer.
 
@@ -52,6 +56,11 @@ int gen_read_header(const char* path, gen_header_t* h);
 uint64_t gen_chunk_count(uint64_t seed, uint64_t chunk);
 uint64_t gen_chunk_fill(uint64_t seed, uint64_t chunk, Node* out);
 bool gen_is_kept(uint64_t seed, uint64_t value);
+
+// Keys for the clustered-insert phase, set by gen_load (count 0 when the
+// data did not come from a generated file).
+extern Node* g_clustered_nodes;
+extern size_t g_clustered_count;
 
 // load_nodes for a generated file.  *valid_count is the requested N (rounded
 // up to odd like load_nodes); *op_count 0 means min(N / 10, 5M).

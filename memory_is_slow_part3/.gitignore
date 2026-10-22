@@ -1,0 +1,14 @@
+# build outputs
+*/benchmark
+*/batched_bench
+*/test
+create_nodes/create_nodes
+create_nodes/fast_nodes
+*.o
+# generated node files and sweep runs (large)
+data/
+run/results/2*/
+*.json
+# the charts regenerate with `uv run charts.py` and `uv run diagrams.py`
+charts/*.png
+__pycache__/

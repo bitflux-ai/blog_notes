@@ -32,6 +32,7 @@ typedef struct {
     Event index;
     Event insert;
     Event delete;
+    Event clustered;   // inserts of one narrow key range, in increasing order
     char notes[1024];
     uint64_t nodes;
 } Stats;

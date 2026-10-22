@@ -7,13 +7,13 @@ bool g_nodes_sorted = false;
 int stats_write_json(const Stats *s, const char *prefix) {
     if (!s || !prefix) { errno = EINVAL; return -1; }
 
-    enum { N_EVENTS = 9 };
+    enum { N_EVENTS = 10 };
     const char *event_names[N_EVENTS] = {
-        "min","max","mean","median","stddev","search","index","insert","delete"
+        "min","max","mean","median","stddev","search","index","insert","delete","clustered"
     };
     const Event *ev[N_EVENTS] = {
         &s->min, &s->max, &s->mean, &s->median, &s->stddev,
-        &s->search, &s->index, &s->insert, &s->delete
+        &s->search, &s->index, &s->insert, &s->delete, &s->clustered
     };
 
     /* Flatten columns (cast to long long for consistent JSON integer printing) */
@@ -290,6 +290,7 @@ void print_results(char* preamble, Stats *stats) {
     print_performance("    index:      ", &stats->index);
     print_performance("    insert:     ", &stats->insert);
     print_performance("    delete:     ", &stats->delete);
+    if (stats->clustered.ops) print_performance("    clustered:  ", &stats->clustered);
 }
 
 char* compare_values(double a, double b, char* result) {

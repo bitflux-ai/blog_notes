@@ -267,6 +267,50 @@ static void* gather(void* arg) {
     return NULL;
 }
 
+Node* g_clustered_nodes = NULL;
+size_t g_clustered_count = 0;
+
+// Clustered inserts: walk the originals up from a random one and take the
+// integers between them that are not inserts (sorted_ins, ascending), until
+// there are ops of them; past the last original every integer is free.
+static int make_clustered(const char* path, size_t n, size_t ops, const uint64_t* sorted_ins, rng_t* rng) {
+    g_clustered_nodes = malloc(ops * sizeof(Node));
+    int fd = open(path, O_RDONLY | O_DIRECT);
+    size_t chunk = BLOCK_BYTES / sizeof(Node);
+    Node* orig = scratch_alloc(chunk * sizeof(Node));
+    void* bounce = scratch_alloc(BLOCK_BYTES);
+    if (!g_clustered_nodes || fd < 0 || !orig || !bounce) return -1;
+    uint64_t i = rng_below(rng, n), got = 0, prev = 0;
+    size_t ins = 0;
+    bool first = true;
+    while (got < ops && i < n) {
+        size_t m = n - i < chunk ? n - i : chunk;
+        if (read_nodes(fd, i, m, orig, bounce) != 0) return -1;
+        for (size_t k = 0; k < m && got < ops; k++) {
+            uint64_t v = orig[k].value;
+            if (first) {
+                prev = v;
+                first = false;
+                while (ins < ops && sorted_ins[ins] <= v) ins++;
+                continue;
+            }
+            for (uint64_t x = prev + 1; x < v && got < ops; x++) {
+                while (ins < ops && sorted_ins[ins] < x) ins++;
+                if (ins < ops && sorted_ins[ins] == x) continue;
+                g_clustered_nodes[got++].value = x;
+            }
+            prev = v;
+        }
+        i += m;
+    }
+    for (uint64_t x = prev + 1; got < ops; x++) g_clustered_nodes[got++].value = x;   // past the top
+    close(fd);
+    scratch_free(orig, chunk * sizeof(Node));
+    scratch_free(bounce, BLOCK_BYTES);
+    g_clustered_count = ops;
+    return 0;
+}
+
 int gen_load(const char* path, size_t* valid_count, Node** nodes, gen_mode_t mode,
              Node** insert_nodes, Node** delete_nodes, size_t** indexes, size_t* op_count) {
     char str1[32], str2[128];
@@ -327,8 +371,17 @@ int gen_load(const char* path, size_t* valid_count, Node** nodes, gen_mode_t mod
     }
     *insert_nodes = malloc(ops * sizeof(Node));
     for (size_t i = 0; i < ops; i++) (*insert_nodes)[i].value = cand[i];
-    scratch_free(cand, cand_bytes);
     printf("  %zu Insert nodes prepared\n", ops);
+
+    // clustered inserts avoid the inserts: sort them (in cand, no longer needed)
+    radix_sort(cand, ops, sizeof(uint64_t));
+    if (make_clustered(path, n, ops, cand, &rng) != 0) {
+        fprintf(stderr, "Error: failed to prepare clustered inserts from %s\n", path);
+        return -1;
+    }
+    scratch_free(cand, cand_bytes);
+    printf("  %zu Clustered insert nodes prepared (%lu..%lu)\n", ops,
+           (unsigned long)g_clustered_nodes[0].value, (unsigned long)g_clustered_nodes[ops - 1].value);
 
     // index picks: anything but the first and last
     *indexes = malloc(ops * sizeof(size_t));
